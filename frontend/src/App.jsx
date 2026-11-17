@@ -1,4 +1,5 @@
-
+import Transactions from "./pages/Transactions";
+import ImportCSV from "./pages/ImportCSV";
 import { useState } from "react";
 
 import {
@@ -82,10 +83,7 @@ export default function App() {
       >
         <Toolbar>
           {isMobile && (
-            <IconButton
-              onClick={() => setMobileOpen(true)}
-              sx={{ mr: 2 }}
-            >
+            <IconButton onClick={() => setMobileOpen(true)} sx={{ mr: 2 }}>
               <MenuIcon />
             </IconButton>
           )}
@@ -121,15 +119,19 @@ export default function App() {
           mt: 8,
         }}
       >
-        {page === "Dashboard" ? (
-          <Dashboard />
-        ) : (
+        {page === "Dashboard" && <Dashboard />}
+
+        {page === "Transactions" && <Transactions />}
+
+        {page === "Import CSV" && <ImportCSV />}
+
+        {page === "Budgets" && (
           <Box>
             <Typography variant="h4" fontWeight={700}>
-              {page}
+              Budgets
             </Typography>
             <Typography color="text.secondary" sx={{ mt: 2 }}>
-              This feature will be implemented next.
+              Monthly budgets will be implemented on Day 4.
             </Typography>
           </Box>
         )}

@@ -23,3 +23,10 @@ class Transaction(BaseModel):
     type: Literal["income", "expense"]
 
     amount_cents: int = Field(gt=0)
+
+
+class BulkTransactionRequest(BaseModel):
+    transactions: list[Transaction] = Field(
+        min_length=1,
+        max_length=500
+    )

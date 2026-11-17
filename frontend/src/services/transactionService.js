@@ -69,3 +69,31 @@ export async function deleteTransaction(id) {
 
   return response.json();
 }
+
+export async function importTransactions(transactions) {
+  const payload = transactions.map(
+    ({ amount, ...details }) => ({
+      ...details,
+      amount_cents: Math.round(amount * 100),
+    })
+  );
+
+  const response = await fetch(
+    "http://127.0.0.1:8000/api/transactions/bulk",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        transactions: payload,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("CSV import failed");
+  }
+
+  return response.json();
+}

@@ -10,8 +10,7 @@ from database import (
     transactions_collection,
     check_database,
 )
-from models import Transaction
-
+from models import Transaction, BulkTransactionRequest
 
 app = FastAPI(title="SpendWise API", version="1.0.0")
 
@@ -79,6 +78,53 @@ def get_transactions():
         for doc in documents
     ]
 
+
+@app.post("/api/transactions/bulk")
+def import_transactions(payload: BulkTransactionRequest):
+    inserted = 0
+    skipped = 0
+    seen_in_file = set()
+
+    for transaction in payload.transactions:
+        data = transaction.model_dump()
+        data["date"] = transaction.date.isoformat()
+
+        # Exact-match duplicate detection.
+        fingerprint = (
+            data["date"],
+            data["description"].strip().casefold(),
+            data["category"].strip().casefold(),
+            data["type"],
+            data["amount_cents"],
+        )
+
+        if fingerprint in seen_in_file:
+            skipped += 1
+            continue
+
+        seen_in_file.add(fingerprint)
+
+        # Check against existing saved transactions.
+        existing = transactions_collection.find_one({
+            "date": data["date"],
+            "description": data["description"],
+            "category": data["category"],
+            "type": data["type"],
+            "amount_cents": data["amount_cents"],
+        })
+
+        if existing:
+            skipped += 1
+            continue
+
+        transactions_collection.insert_one(data)
+        inserted += 1
+
+    return {
+        "message": "Import completed",
+        "inserted": inserted,
+        "skipped": skipped,
+    }
 
 @app.get("/api/transactions/{transaction_id}")
 def get_transaction(transaction_id: str):

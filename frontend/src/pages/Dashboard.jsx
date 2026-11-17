@@ -1,4 +1,6 @@
-
+import { useState, useEffect } from "react";
+import { Alert, CircularProgress } from "@mui/material";
+import { getTransactions } from "../services/transactionService";
 import {
   Box,
   Card,
@@ -29,15 +31,7 @@ import {
   CartesianGrid,
 } from "recharts";
 
-import { transactions } from "../data/mockTransactions";
-
-const COLORS = [
-  "#2563eb",
-  "#10b981",
-  "#f59e0b",
-  "#8b5cf6",
-  "#ef4444",
-];
+const COLORS = ["#2563eb", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444"];
 
 const money = (amount) =>
   new Intl.NumberFormat("en-CA", {
@@ -46,6 +40,38 @@ const money = (amount) =>
   }).format(amount);
 
 export default function Dashboard() {
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadTransactions() {
+      try {
+        const data = await getTransactions();
+
+        if (active) {
+          setTransactions(data);
+        }
+      } catch (err) {
+        if (active) {
+          setError(err.message);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadTransactions();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const income = transactions
     .filter((t) => t.type === "income")
     .reduce((sum, t) => sum + t.amount, 0);
@@ -56,23 +82,20 @@ export default function Dashboard() {
 
   const balance = income - expenses;
 
-  const savingsRate =
-    income > 0 ? (balance / income) * 100 : 0;
+  const savingsRate = income > 0 ? (balance / income) * 100 : 0;
 
   const categoryTotals = {};
 
   transactions
     .filter((t) => t.type === "expense")
     .forEach((t) => {
-      categoryTotals[t.category] =
-        (categoryTotals[t.category] || 0) + t.amount;
+      categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
     });
 
-  const categoryData = Object.entries(categoryTotals)
-    .map(([name, value]) => ({
-      name,
-      value,
-    }));
+  const categoryData = Object.entries(categoryTotals).map(([name, value]) => ({
+    name,
+    value,
+  }));
 
   // Current sample dataset contains November transactions.
   const monthlyData = [
@@ -108,6 +131,13 @@ export default function Dashboard() {
 
   return (
     <Box>
+      {loading && <CircularProgress sx={{ mb: 2 }} />}
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
       <Typography variant="h4" fontWeight={700}>
         Dashboard
       </Typography>
@@ -121,9 +151,7 @@ export default function Dashboard() {
           <Grid key={card.label} size={{ xs: 12, sm: 6, lg: 3 }}>
             <Card sx={{ height: "100%" }}>
               <CardContent>
-                <Typography color="text.secondary">
-                  {card.label}
-                </Typography>
+                <Typography color="text.secondary">{card.label}</Typography>
 
                 <Typography
                   variant="h5"
@@ -252,11 +280,7 @@ export default function Dashboard() {
                           <Chip
                             size="small"
                             label={t.type}
-                            color={
-                              t.type === "income"
-                                ? "success"
-                                : "error"
-                            }
+                            color={t.type === "income" ? "success" : "error"}
                           />
                         </TableCell>
                         <TableCell

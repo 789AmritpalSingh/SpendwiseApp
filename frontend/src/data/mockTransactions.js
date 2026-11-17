@@ -1,0 +1,51 @@
+
+export const transactions = [
+  {
+    id: 1,
+    date: "2026-11-02",
+    description: "Monthly Salary",
+    category: "Salary",
+    type: "income",
+    amount: 4200,
+  },
+  {
+    id: 2,
+    date: "2026-11-04",
+    description: "Walmart",
+    category: "Groceries",
+    type: "expense",
+    amount: 125.50,
+  },
+  {
+    id: 3,
+    date: "2026-11-06",
+    description: "Rent",
+    category: "Housing",
+    type: "expense",
+    amount: 1450,
+  },
+  {
+    id: 4,
+    date: "2026-11-08",
+    description: "Netflix",
+    category: "Entertainment",
+    type: "expense",
+    amount: 18.99,
+  },
+  {
+    id: 5,
+    date: "2026-11-11",
+    description: "Petro Canada",
+    category: "Transportation",
+    type: "expense",
+    amount: 65,
+  },
+  {
+    id: 6,
+    date: "2026-11-14",
+    description: "Freelance Project",
+    category: "Freelance",
+    type: "income",
+    amount: 350,
+  },
+];

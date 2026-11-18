@@ -1,8 +1,7 @@
-import MonthYearSelector, {
-  formatMonthYear,
-} from "../components/MonthYearSelector";
+import MonthYearSelector from "../components/MonthYearSelector";
+import { formatMonthYear } from "../utils/MonthYear";
 import { useEffect, useState } from "react";
-
+import { useToast } from "../hooks/useToast";
 import {
   Box,
   Typography,
@@ -49,6 +48,7 @@ const money = (cents) =>
   }).format(cents / 100);
 
 export default function Budgets() {
+  const showToast = useToast();
   const [month, setMonth] = useState(
     new Date().toLocaleDateString("en-CA").slice(0, 7),
   );
@@ -136,7 +136,8 @@ export default function Budgets() {
       await saveBudget(month, category, amount);
       await refresh();
       setDialogOpen(false);
-      setSuccess("Budget saved successfully.");
+      showToast("Budget saved successfully.");
+      //   setSuccess("Budget saved successfully.");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -156,7 +157,8 @@ export default function Budgets() {
       setError("");
       await deleteBudget(month, budget.category);
       await refresh();
-      setSuccess("Budget deleted successfully.");
+      showToast("Budget deleted successfully.");
+      //   setSuccess("Budget deleted successfully.");
     } catch (err) {
       setError(err.message);
     }

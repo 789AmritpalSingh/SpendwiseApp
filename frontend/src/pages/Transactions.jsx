@@ -1,6 +1,6 @@
 import { formatTransactionDate } from "../utils/date";
 import { useEffect, useMemo, useState } from "react";
-
+import { useToast } from "../hooks/useToast";
 import {
   Box,
   Typography,
@@ -39,6 +39,7 @@ const money = (amount) =>
   }).format(amount);
 
 export default function Transactions() {
+  const showToast = useToast();
   const [transactions, setTransactions] = useState([]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
@@ -60,7 +61,31 @@ export default function Transactions() {
   }
 
   useEffect(() => {
-    loadTransactions();
+    let active = true;
+
+    async function fetchInitialTransactions() {
+      try {
+        const data = await getTransactions();
+
+        if (active) {
+          setTransactions(data);
+        }
+      } catch (err) {
+        if (active) {
+          setError(err.message);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchInitialTransactions();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const filteredTransactions = useMemo(() => {
@@ -76,23 +101,43 @@ export default function Transactions() {
   }, [transactions, search, filter]);
 
   const handleSave = async (transaction) => {
-    if (editing) {
+    const isEditing = Boolean(editing);
+
+    if (isEditing) {
       await updateTransaction(editing.id, transaction);
     } else {
       await addTransaction(transaction);
     }
 
-    await loadTransactions();
+    // Saving succeeded. Refresh the table.
+    showToast(
+      isEditing
+        ? "Transaction updated successfully."
+        : "Transaction added successfully.",
+    );
+
+    // Avoid claiming saving failed if only refresh fails.
+    try {
+      await loadTransactions();
+    } catch {
+      // loadTransactions already handles fetch errors.
+    }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this transaction?")) return;
+    if (!window.confirm("Delete this transaction?")) {
+      return;
+    }
 
     try {
       await deleteTransaction(id);
+
+      showToast("Transaction deleted successfully.");
+
       await loadTransactions();
     } catch (err) {
       setError(err.message);
+      showToast("Unable to delete transaction.", "error");
     }
   };
 
@@ -164,7 +209,7 @@ export default function Transactions() {
         <CircularProgress />
       ) : (
         <Card>
-          <TableContainer>
+          <TableContainer sx={{ overflowX: "auto" }}>
             <Table>
               <TableHead>
                 <TableRow>
@@ -232,12 +277,15 @@ export default function Transactions() {
         </Card>
       )}
 
-      <TransactionForm
-        open={open}
-        transaction={editing}
-        onClose={() => setOpen(false)}
-        onSave={handleSave}
-      />
+      {open && (
+        <TransactionForm
+          key={editing?.id ?? "new"}
+          open={open}
+          transaction={editing}
+          onClose={() => setOpen(false)}
+          onSave={handleSave}
+        />
+      )}
     </Box>
   );
 }

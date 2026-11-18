@@ -2,6 +2,7 @@ import Transactions from "./pages/Transactions";
 import ImportCSV from "./pages/ImportCSV";
 import { useState } from "react";
 import Budgets from "./pages/Budgets";
+import ThemeSwitcher from "./components/ThemeSwitcher";
 
 import {
   Box,
@@ -77,21 +78,28 @@ export default function App() {
         color="inherit"
         elevation={0}
         sx={{
-          borderBottom: "1px solid #e5e7eb",
+          borderBottom: 1,
+          borderColor: "divider",
           width: isMobile ? "100%" : `calc(100% - ${drawerWidth}px)`,
           ml: isMobile ? 0 : `${drawerWidth}px`,
         }}
       >
         <Toolbar>
           {isMobile && (
-            <IconButton onClick={() => setMobileOpen(true)} sx={{ mr: 2 }}>
+            <IconButton
+              onClick={() => setMobileOpen(true)}
+              sx={{ mr: 2 }}
+              aria-label="Open navigation"
+            >
               <MenuIcon />
             </IconButton>
           )}
 
-          <Typography variant="h6" fontWeight={600}>
+          <Typography variant="h6" fontWeight={600} sx={{ flexGrow: 1 }}>
             {page}
           </Typography>
+
+          <ThemeSwitcher />
         </Toolbar>
       </AppBar>
 

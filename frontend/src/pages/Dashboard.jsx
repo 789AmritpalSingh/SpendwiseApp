@@ -1,10 +1,11 @@
-import MonthYearSelector, {
-  formatMonthYear,
-} from "../components/MonthYearSelector";
+import MonthYearSelector from "../components/MonthYearSelector";
+import { formatMonthYear } from "../utils/MonthYear";
 import { formatTransactionDate } from "../utils/date";
-
+import { useTheme } from "@mui/material/styles";
 import { useEffect, useState } from "react";
-
+import { Button } from "@mui/material";
+import { Refresh } from "@mui/icons-material";
+import DashboardSkeleton from "../components/DashboardSkeleton";
 import {
   Box,
   Typography,
@@ -12,7 +13,6 @@ import {
   CardContent,
   Grid,
   Stack,
-  TextField,
   Table,
   TableHead,
   TableBody,
@@ -20,7 +20,6 @@ import {
   TableCell,
   TableContainer,
   Alert,
-  CircularProgress,
   Chip,
 } from "@mui/material";
 
@@ -59,6 +58,14 @@ const money = (cents) =>
   }).format(cents / 100);
 
 export default function Dashboard() {
+  const [retryCount, setRetryCount] = useState(0);
+
+  const theme = useTheme();
+
+  const chartTextColor = theme.palette.text.secondary;
+  const chartGridColor = theme.palette.divider;
+  const chartBackground = theme.palette.background.paper;
+
   const [month, setMonth] = useState(
     new Date().toLocaleDateString("en-CA").slice(0, 7),
   );
@@ -120,7 +127,7 @@ export default function Dashboard() {
     return () => {
       active = false;
     };
-  }, [month]);
+  }, [month, retryCount]);
 
   const summaryCards = [
     {
@@ -169,13 +176,6 @@ export default function Dashboard() {
 
   return (
     <Box>
-      {loading && <CircularProgress sx={{ mb: 2 }} />}
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          Unable to load data for this month: {error}
-        </Alert>
-      )}
       <Stack
         direction={{ xs: "column", sm: "row" }}
         justifyContent="space-between"
@@ -184,7 +184,13 @@ export default function Dashboard() {
         sx={{ mb: 3 }}
       >
         <Box>
-          <Typography variant="h4" fontWeight={700}>
+          <Typography
+            variant="h4"
+            fontWeight={700}
+            sx={{
+              fontSize: { xs: "1.5rem", md: "2rem" },
+            }}
+          >
             Financial Dashboard
           </Typography>
 
@@ -195,6 +201,26 @@ export default function Dashboard() {
 
         <MonthYearSelector value={month} onChange={setMonth} />
       </Stack>
+      {error && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              startIcon={<Refresh />}
+              onClick={() => setRetryCount((count) => count + 1)}
+            >
+              Retry
+            </Button>
+          }
+        >
+          Unable to load financial data: {error}
+        </Alert>
+      )}
+
+      {loading && <DashboardSkeleton />}
 
       {!loading && !error && (
         <Grid container spacing={3}>
@@ -236,10 +262,41 @@ export default function Dashboard() {
                 <Box sx={{ height: 320 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={trendData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
+                      <CartesianGrid
+                        stroke={chartGridColor}
+                        strokeDasharray="3 3"
+                        vertical={false}
+                      />
+
+                      <XAxis
+                        dataKey="month"
+                        tick={{ fill: chartTextColor, fontSize: 12 }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+
+                      <YAxis
+                        tick={{ fill: chartTextColor, fontSize: 12 }}
+                        axisLine={false}
+                        tickLine={false}
+                        tickFormatter={(value) =>
+                          `$${Number(value).toLocaleString("en-CA")}`
+                        }
+                      />
+
                       <Tooltip
+                        contentStyle={{
+                          backgroundColor: chartBackground,
+                          border: `1px solid ${chartGridColor}`,
+                          borderRadius: 10,
+                          color: theme.palette.text.primary,
+                        }}
+                        labelStyle={{
+                          color: theme.palette.text.primary,
+                        }}
+                        itemStyle={{
+                          color: theme.palette.text.primary,
+                        }}
                         formatter={(value) =>
                           new Intl.NumberFormat("en-CA", {
                             style: "currency",
@@ -247,12 +304,15 @@ export default function Dashboard() {
                           }).format(value)
                         }
                       />
-                      <Legend />
+
+                      <Legend wrapperStyle={{ color: chartTextColor }} />
+
                       <Bar
                         dataKey="Income"
                         fill="#16a34a"
                         radius={[5, 5, 0, 0]}
                       />
+
                       <Bar
                         dataKey="Expenses"
                         fill="#ef4444"
@@ -304,7 +364,20 @@ export default function Dashboard() {
                             />
                           ))}
                         </Pie>
+
                         <Tooltip
+                          contentStyle={{
+                            backgroundColor: chartBackground,
+                            border: `1px solid ${chartGridColor}`,
+                            borderRadius: 10,
+                            color: theme.palette.text.primary,
+                          }}
+                          labelStyle={{
+                            color: theme.palette.text.primary,
+                          }}
+                          itemStyle={{
+                            color: theme.palette.text.primary,
+                          }}
                           formatter={(value) =>
                             new Intl.NumberFormat("en-CA", {
                               style: "currency",
@@ -312,7 +385,12 @@ export default function Dashboard() {
                             }).format(value)
                           }
                         />
-                        <Legend />
+
+                        <Legend
+                          wrapperStyle={{
+                            color: chartTextColor,
+                          }}
+                        />
                       </PieChart>
                     </ResponsiveContainer>
                   </Box>
@@ -328,7 +406,7 @@ export default function Dashboard() {
                   Recent Transactions — {formatMonthYear(month)}
                 </Typography>
 
-                <TableContainer>
+                <TableContainer sx={{ overflowX: "auto" }}>
                   <Table>
                     <TableHead>
                       <TableRow>

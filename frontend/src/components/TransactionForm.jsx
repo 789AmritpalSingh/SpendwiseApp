@@ -1,5 +1,4 @@
-
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import {
   Dialog,
@@ -41,28 +40,23 @@ export default function TransactionForm({
   onSave,
   transaction,
 }) {
-  const [form, setForm] = useState(emptyTransaction);
+  const [form, setForm] = useState(() =>
+    transaction
+      ? {
+          date: transaction.date,
+          description: transaction.description,
+          amount: String(transaction.amount),
+          category: transaction.category,
+          type: transaction.type,
+        }
+      : {
+          ...emptyTransaction,
+          date: new Date().toLocaleDateString("en-CA"),
+        },
+  );
+
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      setForm(transaction
-        ? {
-            date: transaction.date,
-            description: transaction.description,
-            amount: String(transaction.amount),
-            category: transaction.category,
-            type: transaction.type,
-          }
-        : {
-            ...emptyTransaction,
-            date: new Date().toLocaleDateString("en-CA"),
-          }
-      );
-      setError("");
-    }
-  }, [open, transaction]);
 
   const updateField = (field, value) => {
     setForm((previous) => ({
@@ -75,10 +69,7 @@ export default function TransactionForm({
     setForm((previous) => ({
       ...previous,
       description,
-      category: categorizeTransaction(
-        description,
-        previous.type
-      ),
+      category: categorizeTransaction(description, previous.type),
     }));
   };
 
@@ -86,10 +77,7 @@ export default function TransactionForm({
     setForm((previous) => ({
       ...previous,
       type,
-      category: categorizeTransaction(
-        previous.description,
-        type
-      ),
+      category: categorizeTransaction(previous.description, type),
     }));
   };
 
@@ -98,10 +86,16 @@ export default function TransactionForm({
 
     const amount = Number(form.amount);
 
-    if (!form.description.trim() || !form.date ||
-        !Number.isFinite(amount) || amount <= 0 ||
-        !/^\d+(\.\d{1,2})?$/.test(String(form.amount))) {
-      setError("Enter a valid description, date and positive amount (max 2 decimals).");
+    if (
+      !form.description.trim() ||
+      !form.date ||
+      !Number.isFinite(amount) ||
+      amount <= 0 ||
+      !/^\d+(\.\d{1,2})?$/.test(String(form.amount))
+    ) {
+      setError(
+        "Enter a valid description, date and positive amount (max 2 decimals).",
+      );
       return;
     }
 

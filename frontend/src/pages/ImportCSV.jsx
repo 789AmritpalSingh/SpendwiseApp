@@ -1,7 +1,6 @@
-
 import { useState } from "react";
 import Papa from "papaparse";
-
+import { useToast } from "../hooks/useToast";
 import {
   Box,
   Typography,
@@ -43,6 +42,7 @@ const money = (amount) =>
     currency: "CAD",
   }).format(amount);
 
+
 function parseAmount(value) {
   const text = String(value ?? "").trim();
 
@@ -63,7 +63,9 @@ function parseAmount(value) {
 function normalizeRow(row, index) {
   const date = String(row.Date ?? "").trim();
   const description = String(row.Description ?? "").trim();
-  const type = String(row.Type ?? "").trim().toLowerCase();
+  const type = String(row.Type ?? "")
+    .trim()
+    .toLowerCase();
   const amount = parseAmount(row.Amount);
 
   const parsedDate = new Date(`${date}T12:00:00Z`);
@@ -94,6 +96,7 @@ function normalizeRow(row, index) {
 }
 
 export default function ImportCSV() {
+  const showToast = useToast();
   const [transactions, setTransactions] = useState([]);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
@@ -127,11 +130,11 @@ export default function ImportCSV() {
 
           const required = ["Date", "Description", "Amount", "Type"];
 
-          if (!required.every((column) =>
-            results.meta.fields?.includes(column)
-          )) {
+          if (
+            !required.every((column) => results.meta.fields?.includes(column))
+          ) {
             throw new Error(
-              "CSV must have Date, Description, Amount and Type columns."
+              "CSV must have Date, Description, Amount and Type columns.",
             );
           }
 
@@ -144,7 +147,7 @@ export default function ImportCSV() {
           }
 
           const normalized = results.data.map((row, index) =>
-            normalizeRow(row, index + 2)
+            normalizeRow(row, index + 2),
           );
 
           setTransactions(normalized);
@@ -162,8 +165,8 @@ export default function ImportCSV() {
   function updateCategory(index, category) {
     setTransactions((previous) =>
       previous.map((transaction, i) =>
-        i === index ? { ...transaction, category } : transaction
-      )
+        i === index ? { ...transaction, category } : transaction,
+      ),
     );
   }
 
@@ -175,10 +178,13 @@ export default function ImportCSV() {
 
     try {
       const response = await importTransactions(transactions);
-
+      showToast(
+        `${response.inserted} transactions imported, ${response.skipped} skipped.`,
+      );
       setResult(response);
       setTransactions([]);
     } catch (err) {
+      showToast("CSV import failed.", "error");
       setError(err.message);
     } finally {
       setImporting(false);
@@ -217,9 +223,7 @@ export default function ImportCSV() {
         </Button>
 
         {fileName && (
-          <Typography sx={{ mt: 2 }}>
-            Selected: {fileName}
-          </Typography>
+          <Typography sx={{ mt: 2 }}>Selected: {fileName}</Typography>
         )}
       </Card>
 
@@ -231,8 +235,8 @@ export default function ImportCSV() {
 
       {result && (
         <Alert severity="success" sx={{ mb: 2 }}>
-          Import complete: {result.inserted} inserted,
-          {" "}{result.skipped} skipped as duplicates.
+          Import complete: {result.inserted} inserted, {result.skipped} skipped
+          as duplicates.
         </Alert>
       )}
 
@@ -258,7 +262,7 @@ export default function ImportCSV() {
             </Button>
           </Stack>
 
-          <TableContainer>
+          <TableContainer sx={{ overflowX: "auto" }}>
             <Table size="small">
               <TableHead>
                 <TableRow>
@@ -280,9 +284,7 @@ export default function ImportCSV() {
                         label={transaction.type}
                         size="small"
                         color={
-                          transaction.type === "income"
-                            ? "success"
-                            : "error"
+                          transaction.type === "income" ? "success" : "error"
                         }
                       />
                     </TableCell>
@@ -291,9 +293,7 @@ export default function ImportCSV() {
                         select
                         size="small"
                         value={transaction.category}
-                        onChange={(e) =>
-                          updateCategory(index, e.target.value)
-                        }
+                        onChange={(e) => updateCategory(index, e.target.value)}
                         sx={{ minWidth: 150 }}
                       >
                         {categories.map((category) => (

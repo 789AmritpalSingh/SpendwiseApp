@@ -1,53 +1,15 @@
+import { Stack, TextField, MenuItem } from "@mui/material";
+import { MONTHS } from "../utils/MonthYear";
 
-import {
-  Stack,
-  TextField,
-  MenuItem,
-} from "@mui/material";
 
-export const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
-export function formatMonthYear(value) {
-  const [year, month] = value.split("-").map(Number);
-
-  if (
-    !Number.isInteger(year) ||
-    !Number.isInteger(month) ||
-    month < 1 ||
-    month > 12
-  ) {
-    return value;
-  }
-
-  return `${MONTHS[month - 1]} ${year}`;
-}
-
-export default function MonthYearSelector({
-  value,
-  onChange,
-}) {
-  const [selectedYear, selectedMonth] = value
-    .split("-")
-    .map(Number);
+export default function MonthYearSelector({ value, onChange }) {
+  const [selectedYear, selectedMonth] = value.split("-").map(Number);
 
   const currentYear = new Date().getFullYear();
 
   const years = Array.from(
     { length: 11 },
-    (_, index) => currentYear - 5 + index
+    (_, index) => currentYear - 5 + index,
   );
 
   // Preserve an existing selection outside the default range.
@@ -65,20 +27,28 @@ export default function MonthYearSelector({
   const handleYearChange = (event) => {
     const year = Number(event.target.value);
 
-    onChange(
-      `${year}-${String(selectedMonth).padStart(2, "0")}`
-    );
+    onChange(`${year}-${String(selectedMonth).padStart(2, "0")}`);
   };
 
   return (
-    <Stack direction="row" spacing={1.5}>
+    <Stack
+      direction="row"
+      spacing={1}
+      sx={{
+        width: { xs: "100%", sm: "auto" },
+        "& .MuiTextField-root": {
+          flex: 1,
+          minWidth: 0,
+        },
+      }}
+    >
+      {" "}
       <TextField
         select
         label="Month"
         size="small"
         value={selectedMonth}
         onChange={handleMonthChange}
-        sx={{ minWidth: 145 }}
       >
         {MONTHS.map((name, index) => (
           <MenuItem key={name} value={index + 1}>
@@ -86,14 +56,12 @@ export default function MonthYearSelector({
           </MenuItem>
         ))}
       </TextField>
-
       <TextField
         select
         label="Year"
         size="small"
         value={selectedYear}
         onChange={handleYearChange}
-        sx={{ minWidth: 110 }}
       >
         {years.map((year) => (
           <MenuItem key={year} value={year}>

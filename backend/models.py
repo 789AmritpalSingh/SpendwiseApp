@@ -30,3 +30,19 @@ class BulkTransactionRequest(BaseModel):
         min_length=1,
         max_length=500
     )
+
+BudgetCategory = Literal[
+    "Groceries",
+    "Food & Dining",
+    "Entertainment",
+    "Transportation",
+    "Housing",
+    "Utilities",
+    "Other"
+]
+
+class Budget(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    category: BudgetCategory
+    limit_cents: int = Field(gt=0)

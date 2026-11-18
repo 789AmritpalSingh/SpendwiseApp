@@ -1,4 +1,4 @@
-
+import { formatTransactionDate } from "../utils/date";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -21,11 +21,7 @@ import {
   Alert,
 } from "@mui/material";
 
-import {
-  Add,
-  Edit,
-  Delete,
-} from "@mui/icons-material";
+import { Add, Edit, Delete } from "@mui/icons-material";
 
 import TransactionForm from "../components/TransactionForm";
 
@@ -70,15 +66,10 @@ export default function Transactions() {
   const filteredTransactions = useMemo(() => {
     return transactions.filter((transaction) => {
       const matchesSearch =
-        transaction.description.toLowerCase().includes(
-          search.toLowerCase()
-        ) ||
-        transaction.category.toLowerCase().includes(
-          search.toLowerCase()
-        );
+        transaction.description.toLowerCase().includes(search.toLowerCase()) ||
+        transaction.category.toLowerCase().includes(search.toLowerCase());
 
-      const matchesType =
-        filter === "all" || transaction.type === filter;
+      const matchesType = filter === "all" || transaction.type === filter;
 
       return matchesSearch && matchesType;
     });
@@ -133,18 +124,16 @@ export default function Transactions() {
           </Typography>
         </Box>
 
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={openAddForm}
-        >
+        <Button variant="contained" startIcon={<Add />} onClick={openAddForm}>
           Add Transaction
         </Button>
       </Stack>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>
-        {error}
-      </Alert>}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
 
       <Card sx={{ p: 2, mb: 3 }}>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
@@ -191,16 +180,16 @@ export default function Transactions() {
               <TableBody>
                 {filteredTransactions.map((transaction) => (
                   <TableRow key={transaction.id} hover>
-                    <TableCell>{transaction.date}</TableCell>
+                    <TableCell>
+                      {formatTransactionDate(transaction.date)}
+                    </TableCell>
                     <TableCell>{transaction.description}</TableCell>
                     <TableCell>{transaction.category}</TableCell>
                     <TableCell>
                       <Chip
                         label={transaction.type}
                         color={
-                          transaction.type === "income"
-                            ? "success"
-                            : "error"
+                          transaction.type === "income" ? "success" : "error"
                         }
                         size="small"
                       />

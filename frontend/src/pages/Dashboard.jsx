@@ -1,133 +1,171 @@
-import { useState, useEffect } from "react";
-import { Alert, CircularProgress } from "@mui/material";
-import { getTransactions } from "../services/transactionService";
+import MonthYearSelector, {
+  formatMonthYear,
+} from "../components/MonthYearSelector";
+import { formatTransactionDate } from "../utils/date";
+
+import { useEffect, useState } from "react";
+
 import {
   Box,
+  Typography,
   Card,
   CardContent,
-  Chip,
   Grid,
-  LinearProgress,
+  Stack,
+  TextField,
   Table,
+  TableHead,
   TableBody,
+  TableRow,
   TableCell,
   TableContainer,
-  TableHead,
-  TableRow,
-  Typography,
+  Alert,
+  CircularProgress,
+  Chip,
 } from "@mui/material";
 
 import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
   BarChart,
   Bar,
   XAxis,
   YAxis,
   CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 
-const COLORS = ["#2563eb", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444"];
+import { getAnalytics } from "../services/analyticsService";
+import { getTransactions } from "../services/transactionService";
+import { getBudgets } from "../services/budgetService";
 
-const money = (amount) =>
+const COLORS = [
+  "#2563eb",
+  "#10b981",
+  "#f59e0b",
+  "#8b5cf6",
+  "#ef4444",
+  "#06b6d4",
+  "#ec4899",
+];
+
+const money = (cents) =>
   new Intl.NumberFormat("en-CA", {
     style: "currency",
     currency: "CAD",
-  }).format(amount);
+  }).format(cents / 100);
 
 export default function Dashboard() {
+  const [month, setMonth] = useState(
+    new Date().toLocaleDateString("en-CA").slice(0, 7),
+  );
+
+  const [analytics, setAnalytics] = useState({
+    income_cents: 0,
+    expenses_cents: 0,
+    balance_cents: 0,
+    savings_rate: 0,
+    monthly_trend: [],
+    category_breakdown: [],
+  });
   const [transactions, setTransactions] = useState([]);
+  const [budgets, setBudgets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
 
-    async function loadTransactions() {
+    async function loadData() {
+      setLoading(true);
+      setAnalytics({
+        income_cents: 0,
+        expenses_cents: 0,
+        balance_cents: 0,
+        savings_rate: 0,
+        monthly_trend: [],
+        category_breakdown: [],
+      });
+
+      setTransactions([]);
+      setBudgets([]);
+      setError("");
+
       try {
-        const data = await getTransactions();
+        const [analyticsData, transactionData, budgetData] = await Promise.all([
+          getAnalytics(month),
+          getTransactions(),
+          getBudgets(month),
+        ]);
 
         if (active) {
-          setTransactions(data);
+          setAnalytics(analyticsData);
+          setTransactions(transactionData);
+          setBudgets(budgetData);
         }
       } catch (err) {
         if (active) {
           setError(err.message);
         }
       } finally {
-        if (active) {
-          setLoading(false);
-        }
+        if (active) setLoading(false);
       }
     }
 
-    loadTransactions();
+    loadData();
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [month]);
 
-  const income = transactions
-    .filter((t) => t.type === "income")
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const expenses = transactions
-    .filter((t) => t.type === "expense")
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const balance = income - expenses;
-
-  const savingsRate = income > 0 ? (balance / income) * 100 : 0;
-
-  const categoryTotals = {};
-
-  transactions
-    .filter((t) => t.type === "expense")
-    .forEach((t) => {
-      categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
-    });
-
-  const categoryData = Object.entries(categoryTotals).map(([name, value]) => ({
-    name,
-    value,
-  }));
-
-  // Current sample dataset contains November transactions.
-  const monthlyData = [
+  const summaryCards = [
     {
-      month: "Nov",
-      Income: income,
-      Expenses: expenses,
-    },
-  ];
-
-  const cards = [
-    {
-      label: "Total Income",
-      value: money(income),
-      color: "#16a34a",
+      label: "Monthly Income",
+      value: money(analytics.income_cents),
+      color: "success.main",
     },
     {
-      label: "Total Expenses",
-      value: money(expenses),
-      color: "#dc2626",
+      label: "Monthly Expenses",
+      value: money(analytics.expenses_cents),
+      color: "error.main",
     },
     {
-      label: "Current Balance",
-      value: money(balance),
-      color: "#2563eb",
+      label: "Monthly Balance",
+      value: money(analytics.balance_cents),
+      color: "primary.main",
     },
     {
       label: "Savings Rate",
-      value: `${savingsRate.toFixed(1)}%`,
-      color: "#8b5cf6",
+      value: `${analytics.savings_rate}%`,
+      color: "secondary.main",
     },
   ];
+
+  const trendData = analytics.monthly_trend.map((item) => ({
+    month: new Date(`${item.month}-01T12:00:00`).toLocaleDateString("en-CA", {
+      month: "short",
+      year: "numeric",
+    }),
+    Income: item.income_cents / 100,
+    Expenses: item.expenses_cents / 100,
+  }));
+
+  const categoryData = analytics.category_breakdown.map((item) => ({
+    name: item.category,
+    value: item.amount_cents / 100,
+  }));
+
+  const recentTransactions = transactions
+    .filter((t) => t.date.startsWith(month))
+    .slice(0, 5);
+
+  const budgetWarnings = budgets.filter(
+    (budget) => budget.status !== "on_track",
+  );
 
   return (
     <Box>
@@ -135,176 +173,211 @@ export default function Dashboard() {
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
+          Unable to load data for this month: {error}
         </Alert>
       )}
-      <Typography variant="h4" fontWeight={700}>
-        Dashboard
-      </Typography>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        justifyContent="space-between"
+        alignItems={{ xs: "stretch", sm: "center" }}
+        spacing={2}
+        sx={{ mb: 3 }}
+      >
+        <Box>
+          <Typography variant="h4" fontWeight={700}>
+            Financial Dashboard
+          </Typography>
 
-      <Typography color="text.secondary" sx={{ mb: 3 }}>
-        Your financial overview — November 2026
-      </Typography>
+          <Typography color="text.secondary">
+            Track your income, expenses and savings
+          </Typography>
+        </Box>
 
-      <Grid container spacing={3}>
-        {cards.map((card) => (
-          <Grid key={card.label} size={{ xs: 12, sm: 6, lg: 3 }}>
-            <Card sx={{ height: "100%" }}>
+        <MonthYearSelector value={month} onChange={setMonth} />
+      </Stack>
+
+      {!loading && !error && (
+        <Grid container spacing={3}>
+          {summaryCards.map((card) => (
+            <Grid key={card.label} size={{ xs: 12, sm: 6, lg: 3 }}>
+              <Card sx={{ height: "100%" }}>
+                <CardContent>
+                  <Typography color="text.secondary">{card.label}</Typography>
+
+                  <Typography
+                    variant="h5"
+                    fontWeight={700}
+                    sx={{ color: card.color, mt: 1 }}
+                  >
+                    {card.value}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+
+          {budgetWarnings.length > 0 && (
+            <Grid size={{ xs: 12 }}>
+              <Alert severity="warning">
+                {budgetWarnings.length} budget category(s) have reached at least
+                80% of their monthly limit:{" "}
+                {budgetWarnings.map((b) => b.category).join(", ")}.
+              </Alert>
+            </Grid>
+          )}
+
+          <Grid size={{ xs: 12, md: 7 }}>
+            <Card>
               <CardContent>
-                <Typography color="text.secondary">{card.label}</Typography>
-
-                <Typography
-                  variant="h5"
-                  fontWeight={700}
-                  sx={{ color: card.color, mt: 1 }}
-                >
-                  {card.value}
+                <Typography variant="h6" gutterBottom>
+                  Income vs Expenses — Last 6 Months
                 </Typography>
+
+                <Box sx={{ height: 320 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={trendData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip
+                        formatter={(value) =>
+                          new Intl.NumberFormat("en-CA", {
+                            style: "currency",
+                            currency: "CAD",
+                          }).format(value)
+                        }
+                      />
+                      <Legend />
+                      <Bar
+                        dataKey="Income"
+                        fill="#16a34a"
+                        radius={[5, 5, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="Expenses"
+                        fill="#ef4444"
+                        radius={[5, 5, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Box>
               </CardContent>
             </Card>
           </Grid>
-        ))}
 
-        <Grid size={{ xs: 12, md: 7 }}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Income vs Expenses
-              </Typography>
+          <Grid size={{ xs: 12, md: 5 }}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Spending by Category
+                </Typography>
 
-              <Box sx={{ height: 300 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => money(value)} />
-                    <Legend />
-                    <Bar
-                      dataKey="Income"
-                      fill="#16a34a"
-                      radius={[6, 6, 0, 0]}
-                    />
-                    <Bar
-                      dataKey="Expenses"
-                      fill="#ef4444"
-                      radius={[6, 6, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid size={{ xs: 12, md: 5 }}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Spending by Category
-              </Typography>
-
-              <Box sx={{ height: 300 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={categoryData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="45%"
-                      outerRadius={85}
-                    >
-                      {categoryData.map((entry, index) => (
-                        <Cell
-                          key={entry.name}
-                          fill={COLORS[index % COLORS.length]}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => money(value)} />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid size={{ xs: 12, md: 12 }}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Savings Overview
-              </Typography>
-
-              <Typography color="text.secondary" sx={{ mb: 1 }}>
-                {money(balance)} remaining from {money(income)}
-              </Typography>
-
-              <LinearProgress
-                variant="determinate"
-                value={Math.min(100, Math.max(0, savingsRate))}
-                sx={{ height: 10, borderRadius: 5 }}
-              />
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid size={{ xs: 12 }}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" sx={{ mb: 2 }}>
-                Recent Transactions
-              </Typography>
-
-              <TableContainer>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Date</TableCell>
-                      <TableCell>Description</TableCell>
-                      <TableCell>Category</TableCell>
-                      <TableCell>Type</TableCell>
-                      <TableCell align="right">Amount</TableCell>
-                    </TableRow>
-                  </TableHead>
-
-                  <TableBody>
-                    {[...transactions].reverse().map((t) => (
-                      <TableRow key={t.id} hover>
-                        <TableCell>{t.date}</TableCell>
-                        <TableCell>{t.description}</TableCell>
-                        <TableCell>{t.category}</TableCell>
-                        <TableCell>
-                          <Chip
-                            size="small"
-                            label={t.type}
-                            color={t.type === "income" ? "success" : "error"}
-                          />
-                        </TableCell>
-                        <TableCell
-                          align="right"
-                          sx={{
-                            color:
-                              t.type === "income"
-                                ? "success.main"
-                                : "error.main",
-                            fontWeight: 600,
-                          }}
+                {categoryData.length === 0 ? (
+                  <Box
+                    sx={{
+                      height: 320,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Typography color="text.secondary">
+                      No expenses for this month
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Box sx={{ height: 320 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={categoryData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="45%"
+                          outerRadius={85}
                         >
-                          {t.type === "income" ? "+" : "-"}
-                          {money(t.amount)}
-                        </TableCell>
+                          {categoryData.map((entry, i) => (
+                            <Cell
+                              key={entry.name}
+                              fill={COLORS[i % COLORS.length]}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value) =>
+                            new Intl.NumberFormat("en-CA", {
+                              style: "currency",
+                              currency: "CAD",
+                            }).format(value)
+                          }
+                        />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid size={{ xs: 12 }}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" sx={{ mb: 2 }}>
+                  Recent Transactions — {formatMonthYear(month)}
+                </Typography>
+
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Date</TableCell>
+                        <TableCell>Description</TableCell>
+                        <TableCell>Category</TableCell>
+                        <TableCell>Type</TableCell>
+                        <TableCell align="right">Amount</TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </CardContent>
-          </Card>
+                    </TableHead>
+
+                    <TableBody>
+                      {recentTransactions.map((t) => (
+                        <TableRow key={t.id} hover>
+                          <TableCell>{formatTransactionDate(t.date)}</TableCell>
+                          <TableCell>{t.description}</TableCell>
+                          <TableCell>{t.category}</TableCell>
+                          <TableCell>
+                            <Chip
+                              size="small"
+                              label={t.type}
+                              color={t.type === "income" ? "success" : "error"}
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            {t.type === "income" ? "+" : "-"}
+                            {new Intl.NumberFormat("en-CA", {
+                              style: "currency",
+                              currency: "CAD",
+                            }).format(t.amount)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+
+                      {recentTransactions.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} align="center">
+                            No transactions for this month
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          </Grid>
         </Grid>
-      </Grid>
+      )}
     </Box>
   );
 }

@@ -1,6 +1,7 @@
 import Transactions from "./pages/Transactions";
 import ImportCSV from "./pages/ImportCSV";
 import { useState } from "react";
+import Budgets from "./pages/Budgets";
 
 import {
   Box,
@@ -125,16 +126,7 @@ export default function App() {
 
         {page === "Import CSV" && <ImportCSV />}
 
-        {page === "Budgets" && (
-          <Box>
-            <Typography variant="h4" fontWeight={700}>
-              Budgets
-            </Typography>
-            <Typography color="text.secondary" sx={{ mt: 2 }}>
-              Monthly budgets will be implemented on Day 4.
-            </Typography>
-          </Box>
-        )}
+        {page === "Budgets" && <Budgets />}
       </Box>
     </Box>
   );

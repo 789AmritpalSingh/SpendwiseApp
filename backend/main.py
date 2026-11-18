@@ -4,6 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from bson import ObjectId
 from bson.errors import InvalidId
 from pymongo import DESCENDING
+from routes.budgets import router as budgets_router
+from routes.analytics import router as analytics_router
 
 from database import (
     client,
@@ -24,6 +26,9 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Content-Type"],
 )
+
+app.include_router(budgets_router)
+app.include_router(analytics_router)
 
 
 def serialize_transaction(transaction):

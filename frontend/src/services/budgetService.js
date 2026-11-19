@@ -1,42 +1,30 @@
 
-const API_BASE = "http://127.0.0.1:8000/api/budgets";
-
-export async function getBudgets(month) {
-  const response = await fetch(`${API_BASE}/${month}`);
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch budgets");
-  }
-
-  return response.json();
+export async function getBudgets(apiRequest, month) {
+  return apiRequest(`/api/budgets/${month}`);
 }
 
-export async function saveBudget(month, category, limit) {
-  const response = await fetch(`${API_BASE}/${month}`, {
+export async function saveBudget(
+  apiRequest,
+  month,
+  category,
+  limit
+) {
+  return apiRequest(`/api/budgets/${month}`, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify({
       category,
       limit_cents: Math.round(limit * 100),
     }),
   });
-
-  if (!response.ok) {
-    throw new Error("Failed to save budget");
-  }
-
-  return response.json();
 }
 
-export async function deleteBudget(month, category) {
-  const response = await fetch(
-    `${API_BASE}/${month}/${encodeURIComponent(category)}`,
+export async function deleteBudget(
+  apiRequest,
+  month,
+  category
+) {
+  return apiRequest(
+    `/api/budgets/${month}/${encodeURIComponent(category)}`,
     { method: "DELETE" }
   );
-
-  if (!response.ok) {
-    throw new Error("Failed to delete budget");
-  }
 }

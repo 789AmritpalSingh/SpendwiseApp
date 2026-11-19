@@ -22,7 +22,7 @@ import {
 } from "@mui/material";
 
 import { Add, Edit, Delete } from "@mui/icons-material";
-
+import { useApi } from "../hooks/useApi";
 import TransactionForm from "../components/TransactionForm";
 
 import {
@@ -39,6 +39,7 @@ const money = (amount) =>
   }).format(amount);
 
 export default function Transactions() {
+  const apiRequest = useApi();
   const showToast = useToast();
   const [transactions, setTransactions] = useState([]);
   const [search, setSearch] = useState("");
@@ -51,7 +52,7 @@ export default function Transactions() {
   async function loadTransactions() {
     try {
       setError("");
-      const data = await getTransactions();
+      const data = await getTransactions(apiRequest);
       setTransactions(data);
     } catch (err) {
       setError(err.message);
@@ -65,7 +66,7 @@ export default function Transactions() {
 
     async function fetchInitialTransactions() {
       try {
-        const data = await getTransactions();
+        const data = await getTransactions(apiRequest);
 
         if (active) {
           setTransactions(data);
@@ -86,7 +87,7 @@ export default function Transactions() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [apiRequest]);
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter((transaction) => {
@@ -104,9 +105,9 @@ export default function Transactions() {
     const isEditing = Boolean(editing);
 
     if (isEditing) {
-      await updateTransaction(editing.id, transaction);
+      await updateTransaction(apiRequest, editing.id, transaction);
     } else {
-      await addTransaction(transaction);
+      await addTransaction(apiRequest, transaction);
     }
 
     // Saving succeeded. Refresh the table.
@@ -130,7 +131,7 @@ export default function Transactions() {
     }
 
     try {
-      await deleteTransaction(id);
+      await deleteTransaction(apiRequest, id);
 
       showToast("Transaction deleted successfully.");
 

@@ -3,7 +3,10 @@ import ImportCSV from "./pages/ImportCSV";
 import { useState } from "react";
 import Budgets from "./pages/Budgets";
 import ThemeSwitcher from "./components/ThemeSwitcher";
+import { useAuth, UserButton } from "@clerk/react";
 
+import { CircularProgress } from "@mui/material";
+import AuthScreen from "./components/AuthScreen";
 import {
   Box,
   Drawer,
@@ -39,6 +42,7 @@ const menuItems = [
 ];
 
 export default function App() {
+  const { isLoaded, isSignedIn } = useAuth();
   const [page, setPage] = useState("Dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -71,6 +75,24 @@ export default function App() {
     </Box>
   );
 
+  if (!isLoaded) {
+    return (
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!isSignedIn) {
+    return <AuthScreen />;
+  }
+
   return (
     <Box sx={{ display: "flex" }}>
       <AppBar
@@ -100,6 +122,9 @@ export default function App() {
           </Typography>
 
           <ThemeSwitcher />
+          <Box sx={{ ml: 2 }}>
+            <UserButton />
+          </Box>
         </Toolbar>
       </AppBar>
 

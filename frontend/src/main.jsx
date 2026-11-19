@@ -1,17 +1,31 @@
+
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { ToastProvider } from "./context/ToastContext";
+import { ClerkProvider } from "@clerk/react";
+
 import App from "./App";
 import { ThemeModeProvider } from "./context/ThemeModeContext";
+import { ToastProvider } from "./context/ToastContext";
 
 import "./index.css";
 
-ReactDOM.createRoot(document.getElementById("root")).render(
+const PUBLISHABLE_KEY =
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+
+if (!PUBLISHABLE_KEY) {
+  throw new Error("Missing Clerk Publishable Key");
+}
+
+ReactDOM.createRoot(
+  document.getElementById("root")
+).render(
   <React.StrictMode>
-    <ThemeModeProvider>
-      <ToastProvider>
-        <App />
-      </ToastProvider>
-    </ThemeModeProvider>
-  </React.StrictMode>,
+    <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+      <ThemeModeProvider>
+        <ToastProvider>
+          <App />
+        </ToastProvider>
+      </ThemeModeProvider>
+    </ClerkProvider>
+  </React.StrictMode>
 );

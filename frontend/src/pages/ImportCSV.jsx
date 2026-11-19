@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Papa from "papaparse";
 import { useToast } from "../hooks/useToast";
+import { useApi } from "../hooks/useApi";
 import {
   Box,
   Typography,
@@ -96,6 +97,7 @@ function normalizeRow(row, index) {
 }
 
 export default function ImportCSV() {
+  const apiRequest = useApi();
   const showToast = useToast();
   const [transactions, setTransactions] = useState([]);
   const [error, setError] = useState("");
@@ -177,7 +179,7 @@ export default function ImportCSV() {
     setError("");
 
     try {
-      const response = await importTransactions(transactions);
+      const response = await importTransactions(apiRequest, transactions);
       showToast(
         `${response.inserted} transactions imported, ${response.skipped} skipped.`,
       );

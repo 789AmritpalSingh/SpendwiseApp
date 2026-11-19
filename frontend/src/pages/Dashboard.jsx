@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@mui/material";
 import { Refresh } from "@mui/icons-material";
 import DashboardSkeleton from "../components/DashboardSkeleton";
+import { useApi } from "../hooks/useApi";
 import {
   Box,
   Typography,
@@ -59,7 +60,7 @@ const money = (cents) =>
 
 export default function Dashboard() {
   const [retryCount, setRetryCount] = useState(0);
-
+  const apiRequest = useApi();
   const theme = useTheme();
 
   const chartTextColor = theme.palette.text.secondary;
@@ -103,9 +104,9 @@ export default function Dashboard() {
 
       try {
         const [analyticsData, transactionData, budgetData] = await Promise.all([
-          getAnalytics(month),
-          getTransactions(),
-          getBudgets(month),
+          getAnalytics(apiRequest, month),
+          getTransactions(apiRequest),
+          getBudgets(apiRequest, month),
         ]);
 
         if (active) {
@@ -127,7 +128,7 @@ export default function Dashboard() {
     return () => {
       active = false;
     };
-  }, [month, retryCount]);
+  }, [month, retryCount, apiRequest]);
 
   const summaryCards = [
     {

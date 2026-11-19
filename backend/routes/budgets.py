@@ -1,54 +1,70 @@
 
 import re
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException
 from pymongo import ASCENDING
 
+from auth import get_current_user
 from database import db, transactions_collection
 from models import Budget
 
-router = APIRouter(prefix="/api/budgets", tags=["Budgets"])
+
+router = APIRouter(
+    prefix="/api/budgets",
+    tags=["Budgets"],
+)
 
 budgets_collection = db["budgets"]
 
 
-class BudgetPeriod(BaseModel):
-    month: str = Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")
+# --------------------------------------------------
+# HELPER FUNCTIONS
+# --------------------------------------------------
 
-
-def validate_month(month):
+def validate_month(month: str) -> str:
     if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):
         raise HTTPException(
             status_code=422,
-            detail="Month must use YYYY-MM"
+            detail="Month must use YYYY-MM",
         )
+
     return month
 
 
-def calculate_spending(month):
-    rows = transactions_collection.find({
-        "date": {"$regex": f"^{month}-"},
-        "type": "expense",
-    })
+def calculate_spending(month: str, user_id: str) -> dict:
+    """
+    Calculate expenses by category for one user
+    and one selected month.
+    """
+
+    transactions = transactions_collection.find(
+        {
+            "user_id": user_id,
+            "date": {"$regex": f"^{month}-"},
+            "type": "expense",
+        }
+    )
 
     spending = {}
 
-    for row in rows:
-        category = row["category"]
+    for transaction in transactions:
+        category = transaction["category"]
+        amount = transaction["amount_cents"]
+
         spending[category] = (
-            spending.get(category, 0) + row["amount_cents"]
+            spending.get(category, 0) + amount
         )
 
     return spending
 
 
-def serialize_budget(document, spending):
+def serialize_budget(document: dict, spending: dict) -> dict:
     category = document["category"]
+
     limit = document["limit_cents"]
     spent = spending.get(category, 0)
 
-    percentage = round(spent / limit * 100, 1)
+    percentage = round((spent / limit) * 100, 1)
 
     if percentage >= 100:
         status = "exceeded"
@@ -69,67 +85,106 @@ def serialize_budget(document, spending):
     }
 
 
+# --------------------------------------------------
+# GET BUDGETS FOR A SELECTED MONTH
+# --------------------------------------------------
+
 @router.get("/{month}")
-def get_budgets(month: str):
+def get_budgets(
+    month: str,
+    user_id: str = Depends(get_current_user),
+):
     validate_month(month)
 
-    spending = calculate_spending(month)
+    spending = calculate_spending(month, user_id)
 
     documents = budgets_collection.find(
-        {"month": month}
+        {
+            "user_id": user_id,
+            "month": month,
+        }
     ).sort("category", ASCENDING)
 
     return [
-        serialize_budget(doc, spending)
-        for doc in documents
+        serialize_budget(document, spending)
+        for document in documents
     ]
 
 
+# --------------------------------------------------
+# CREATE OR UPDATE A MONTHLY BUDGET
+# --------------------------------------------------
+
 @router.put("/{month}")
-def save_budget(month: str, budget: Budget):
+def save_budget(
+    month: str,
+    budget: Budget,
+    user_id: str = Depends(get_current_user),
+):
     validate_month(month)
 
+    # One budget per category/month for each user.
+    # Create this index only after removing the old
+    # unique (month, category) index from Day 4.
     budgets_collection.create_index(
-        [("month", ASCENDING), ("category", ASCENDING)],
-        unique=True
+        [
+            ("user_id", ASCENDING),
+            ("month", ASCENDING),
+            ("category", ASCENDING),
+        ],
+        unique=True,
+        name="unique_user_month_category",
     )
 
-    budgets_collection.update_one(
-        {
-            "month": month,
-            "category": budget.category,
-        },
-        {
-            "$set": {
-                "limit_cents": budget.limit_cents
-            }
-        },
-        upsert=True
-    )
-
-    saved = budgets_collection.find_one({
+    filter_query = {
+        "user_id": user_id,
         "month": month,
         "category": budget.category,
-    })
+    }
 
-    spending = calculate_spending(month)
+    budgets_collection.update_one(
+        filter_query,
+        {
+            "$set": {
+                "limit_cents": budget.limit_cents,
+            }
+        },
+        upsert=True,
+    )
+
+    saved = budgets_collection.find_one(filter_query)
+
+    spending = calculate_spending(month, user_id)
 
     return serialize_budget(saved, spending)
 
 
+# --------------------------------------------------
+# DELETE A MONTHLY BUDGET
+# --------------------------------------------------
+
 @router.delete("/{month}/{category}")
-def delete_budget(month: str, category: str):
+def delete_budget(
+    month: str,
+    category: str,
+    user_id: str = Depends(get_current_user),
+):
     validate_month(month)
 
-    result = budgets_collection.delete_one({
-        "month": month,
-        "category": category,
-    })
+    result = budgets_collection.delete_one(
+        {
+            "user_id": user_id,
+            "month": month,
+            "category": category,
+        }
+    )
 
     if result.deleted_count == 0:
         raise HTTPException(
             status_code=404,
-            detail="Budget not found"
+            detail="Budget not found",
         )
 
-    return {"message": "Budget deleted successfully"}
+    return {
+        "message": "Budget deleted successfully",
+    }

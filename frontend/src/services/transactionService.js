@@ -1,14 +1,6 @@
 
-const API_URL = "http://127.0.0.1:8000/api/transactions";
-
-export async function getTransactions() {
-  const response = await fetch(API_URL);
-
-  if (!response.ok) {
-    throw new Error("Unable to load transactions");
-  }
-
-  const data = await response.json();
+export async function getTransactions(apiRequest) {
+  const data = await apiRequest("/api/transactions");
 
   return data.map((transaction) => ({
     ...transaction,
@@ -16,61 +8,44 @@ export async function getTransactions() {
   }));
 }
 
-export async function addTransaction(transaction) {
+export async function addTransaction(apiRequest, transaction) {
   const { amount, ...details } = transaction;
 
-  const response = await fetch(API_URL, {
+  return apiRequest("/api/transactions", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify({
       ...details,
       amount_cents: Math.round(amount * 100),
     }),
   });
-
-  if (!response.ok) {
-    throw new Error("Unable to add transaction");
-  }
-
-  return response.json();
 }
 
-export async function updateTransaction(id, transaction) {
+export async function updateTransaction(
+  apiRequest,
+  id,
+  transaction
+) {
   const { amount, ...details } = transaction;
 
-  const response = await fetch(`${API_URL}/${id}`, {
+  return apiRequest(`/api/transactions/${id}`, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify({
       ...details,
       amount_cents: Math.round(amount * 100),
     }),
   });
-
-  if (!response.ok) {
-    throw new Error("Unable to update transaction");
-  }
-
-  return response.json();
 }
 
-export async function deleteTransaction(id) {
-  const response = await fetch(`${API_URL}/${id}`, {
+export async function deleteTransaction(apiRequest, id) {
+  return apiRequest(`/api/transactions/${id}`, {
     method: "DELETE",
   });
-
-  if (!response.ok) {
-    throw new Error("Unable to delete transaction");
-  }
-
-  return response.json();
 }
 
-export async function importTransactions(transactions) {
+export async function importTransactions(
+  apiRequest,
+  transactions
+) {
   const payload = transactions.map(
     ({ amount, ...details }) => ({
       ...details,
@@ -78,22 +53,10 @@ export async function importTransactions(transactions) {
     })
   );
 
-  const response = await fetch(
-    "http://127.0.0.1:8000/api/transactions/bulk",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        transactions: payload,
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error("CSV import failed");
-  }
-
-  return response.json();
+  return apiRequest("/api/transactions/bulk", {
+    method: "POST",
+    body: JSON.stringify({
+      transactions: payload,
+    }),
+  });
 }

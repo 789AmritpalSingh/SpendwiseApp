@@ -2,6 +2,7 @@ import MonthYearSelector from "../components/MonthYearSelector";
 import { formatMonthYear } from "../utils/MonthYear";
 import { useEffect, useState } from "react";
 import { useToast } from "../hooks/useToast";
+import { useApi } from "../hooks/useApi";
 import {
   Box,
   Typography,
@@ -48,6 +49,7 @@ const money = (cents) =>
   }).format(cents / 100);
 
 export default function Budgets() {
+  const apiRequest = useApi();
   const showToast = useToast();
   const [month, setMonth] = useState(
     new Date().toLocaleDateString("en-CA").slice(0, 7),
@@ -74,7 +76,7 @@ export default function Budgets() {
       setBudgets([]);
 
       try {
-        const data = await getBudgets(month);
+        const data = await getBudgets(apiRequest, month);
         if (active) setBudgets(data);
       } catch (err) {
         if (active) setError(err.message);
@@ -88,10 +90,10 @@ export default function Budgets() {
     return () => {
       active = false;
     };
-  }, [month]);
+  }, [month, apiRequest]);
 
   async function refresh() {
-    const data = await getBudgets(month);
+    const data = await getBudgets(apiRequest, month);
     setBudgets(data);
   }
 
@@ -133,7 +135,7 @@ export default function Budgets() {
     setError("");
 
     try {
-      await saveBudget(month, category, amount);
+      await saveBudget(apiRequest, month, category, amount);
       await refresh();
       setDialogOpen(false);
       showToast("Budget saved successfully.");
@@ -155,7 +157,7 @@ export default function Budgets() {
 
     try {
       setError("");
-      await deleteBudget(month, budget.category);
+      await deleteBudget(apiRequest, month, budget.category);
       await refresh();
       showToast("Budget deleted successfully.");
       //   setSuccess("Budget deleted successfully.");

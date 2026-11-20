@@ -1,10 +1,16 @@
 
-from fastapi import FastAPI, HTTPException, Depends
+import logging
+import hashlib
+import json
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
-
+from fastapi.responses import JSONResponse
 from bson import ObjectId
+from slowapi.errors import RateLimitExceeded
+from rate_limit import limiter
 from bson.errors import InvalidId
 from pymongo import DESCENDING
+from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from routes.budgets import router as budgets_router
 from routes.analytics import router as analytics_router
@@ -20,6 +26,13 @@ from models import Transaction, BulkTransactionRequest
 
 
 # --------------------------------------------------
+# LOGGING
+# --------------------------------------------------
+
+logger = logging.getLogger("spendwise.api")
+
+
+# --------------------------------------------------
 # FASTAPI APPLICATION
 # --------------------------------------------------
 
@@ -29,6 +42,27 @@ app = FastAPI(
     description="Personal Finance Management API",
 )
 
+# --------------------------------------------------
+# RATE LIMITING
+# --------------------------------------------------
+
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_exceeded_handler(
+    request: Request,
+    exc: RateLimitExceeded,
+):
+    return JSONResponse(
+        status_code=429,
+        content={
+            "detail": (
+                "Too many requests. "
+                "Please try again later."
+            )
+        },
+    )
 
 # --------------------------------------------------
 # CORS CONFIGURATION
@@ -47,6 +81,46 @@ app.add_middleware(
         "Authorization",
     ],
 )
+
+
+# --------------------------------------------------
+# DATABASE ERROR HANDLING
+# --------------------------------------------------
+
+@app.exception_handler(DuplicateKeyError)
+async def handle_duplicate_key(request, exc):
+    logger.warning(
+        "Database unique constraint conflict on %s",
+        request.url.path,
+    )
+
+    return JSONResponse(
+        status_code=409,
+        content={
+            "detail": (
+                "A conflicting record already exists."
+            )
+        },
+    )
+
+
+@app.exception_handler(PyMongoError)
+async def handle_database_error(request, exc):
+    logger.error(
+        "Database operation failed on %s",
+        request.url.path,
+        exc_info=True,
+    )
+
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": (
+                "Database temporarily unavailable. "
+                "Please try again."
+            )
+        },
+    )
 
 
 # --------------------------------------------------
@@ -80,7 +154,7 @@ def get_object_id(transaction_id):
         raise HTTPException(
             status_code=400,
             detail="Invalid transaction ID",
-        )
+        ) from None
 
 
 # --------------------------------------------------
@@ -105,11 +179,11 @@ def health():
             "database": "connected",
         }
 
-    except Exception:
+    except PyMongoError:
         raise HTTPException(
             status_code=503,
             detail="Database unavailable",
-        )
+        ) from None
 
 
 # --------------------------------------------------
@@ -118,11 +192,15 @@ def health():
 # --------------------------------------------------
 
 @app.get("/api/transactions")
+@limiter.limit("120/minute")
 def get_transactions(
+    request: Request,
     user_id: str = Depends(get_current_user),
 ):
     documents = transactions_collection.find(
-        {"user_id": user_id}
+        {
+            "user_id": user_id,
+        }
     ).sort(
         [
             ("date", DESCENDING),
@@ -141,59 +219,67 @@ def get_transactions(
 # AUTHENTICATED USER ONLY
 # --------------------------------------------------
 
+
 @app.post("/api/transactions/bulk")
+@limiter.limit("10/minute")
 def import_transactions(
+    request: Request,
     payload: BulkTransactionRequest,
     user_id: str = Depends(get_current_user),
 ):
+    # Convert validated Pydantic models into JSON-compatible
+    # documents. Dates remain YYYY-MM-DD strings.
+    documents = [
+        transaction.model_dump(mode="json")
+        for transaction in payload.transactions
+    ]
+
+    # Hash the validated batch, preserving row order and
+    # repeated transactions.
+    batch_content = json.dumps(
+        documents,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+
+    batch_id = hashlib.sha256(
+        batch_content.encode("utf-8")
+    ).hexdigest()
+
     inserted = 0
     skipped = 0
 
-    seen_in_file = set()
+    for row_index, document in enumerate(documents):
+        # Ownership always comes from the verified Clerk
+        # session, never from the CSV or frontend.
+        document["user_id"] = user_id
 
-    for transaction in payload.transactions:
+        # Identify the original import batch and row.
+        document["import_batch_id"] = batch_id
+        document["import_row_index"] = row_index
 
-        data = transaction.model_dump()
+        # An existing row in the same batch is skipped.
+        # Repeated purchase rows within a new batch remain
+        # separate because each has a different row_index.
+        filter_query = {
+            "user_id": user_id,
+            "import_batch_id": batch_id,
+            "import_row_index": row_index,
+        }
 
-        data["date"] = transaction.date.isoformat()
-
-        # Assign ownership using verified Clerk identity.
-        data["user_id"] = user_id
-
-        # Duplicate identification within the uploaded CSV.
-        fingerprint = (
-            data["date"],
-            data["description"].strip().casefold(),
-            data["category"].strip().casefold(),
-            data["type"],
-            data["amount_cents"],
-        )
-
-        if fingerprint in seen_in_file:
-            skipped += 1
-            continue
-
-        seen_in_file.add(fingerprint)
-
-        # Check duplicates only within this user's data.
-        existing = transactions_collection.find_one(
+        result = transactions_collection.update_one(
+            filter_query,
             {
-                "user_id": user_id,
-                "date": data["date"],
-                "description": data["description"],
-                "category": data["category"],
-                "type": data["type"],
-                "amount_cents": data["amount_cents"],
-            }
+                "$setOnInsert": document,
+            },
+            upsert=True,
         )
 
-        if existing is not None:
+        if result.upserted_id is not None:
+            inserted += 1
+        else:
             skipped += 1
-            continue
-
-        transactions_collection.insert_one(data)
-
-        inserted += 1
 
     return {
         "message": "Import completed",
@@ -208,7 +294,9 @@ def import_transactions(
 # --------------------------------------------------
 
 @app.get("/api/transactions/{transaction_id}")
+@limiter.limit("120/minute")
 def get_transaction(
+    request: Request,
     transaction_id: str,
     user_id: str = Depends(get_current_user),
 ):
@@ -236,13 +324,15 @@ def get_transaction(
 # --------------------------------------------------
 
 @app.post("/api/transactions", status_code=201)
+@limiter.limit("60/minute")
 def create_transaction(
+    request: Request,
     transaction: Transaction,
     user_id: str = Depends(get_current_user),
 ):
-    data = transaction.model_dump()
-
-    data["date"] = transaction.date.isoformat()
+    data = transaction.model_dump(
+        mode="json"
+    )
 
     # Never accept user ownership from the frontend.
     data["user_id"] = user_id
@@ -265,16 +355,18 @@ def create_transaction(
 # --------------------------------------------------
 
 @app.put("/api/transactions/{transaction_id}")
+@limiter.limit("60/minute")
 def update_transaction(
+    request: Request,
     transaction_id: str,
     transaction: Transaction,
     user_id: str = Depends(get_current_user),
 ):
     obj_id = get_object_id(transaction_id)
 
-    data = transaction.model_dump()
-
-    data["date"] = transaction.date.isoformat()
+    data = transaction.model_dump(
+        mode="json"
+    )
 
     result = transactions_collection.update_one(
         {
@@ -308,7 +400,9 @@ def update_transaction(
 # --------------------------------------------------
 
 @app.delete("/api/transactions/{transaction_id}")
+@limiter.limit("60/minute")
 def delete_transaction(
+    request: Request,
     transaction_id: str,
     user_id: str = Depends(get_current_user),
 ):

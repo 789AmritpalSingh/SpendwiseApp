@@ -22,7 +22,10 @@ budgets_collection = db["budgets"]
 # --------------------------------------------------
 
 def validate_month(month: str) -> str:
-    if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):
+    if not re.fullmatch(
+        r"\d{4}-(0[1-9]|1[0-2])",
+        month,
+    ):
         raise HTTPException(
             status_code=422,
             detail="Month must use YYYY-MM",
@@ -33,8 +36,8 @@ def validate_month(month: str) -> str:
 
 def calculate_spending(month: str, user_id: str) -> dict:
     """
-    Calculate expenses by category for one user
-    and one selected month.
+    Calculate expenses by category for one
+    authenticated user and selected month.
     """
 
     transactions = transactions_collection.find(
@@ -64,7 +67,10 @@ def serialize_budget(document: dict, spending: dict) -> dict:
     limit = document["limit_cents"]
     spent = spending.get(category, 0)
 
-    percentage = round((spent / limit) * 100, 1)
+    percentage = round(
+        (spent / limit) * 100,
+        1,
+    )
 
     if percentage >= 100:
         status = "exceeded"
@@ -96,14 +102,20 @@ def get_budgets(
 ):
     validate_month(month)
 
-    spending = calculate_spending(month, user_id)
+    spending = calculate_spending(
+        month,
+        user_id,
+    )
 
     documents = budgets_collection.find(
         {
             "user_id": user_id,
             "month": month,
         }
-    ).sort("category", ASCENDING)
+    ).sort(
+        "category",
+        ASCENDING,
+    )
 
     return [
         serialize_budget(document, spending)
@@ -123,18 +135,8 @@ def save_budget(
 ):
     validate_month(month)
 
-    # One budget per category/month for each user.
-    # Create this index only after removing the old
-    # unique (month, category) index from Day 4.
-    budgets_collection.create_index(
-        [
-            ("user_id", ASCENDING),
-            ("month", ASCENDING),
-            ("category", ASCENDING),
-        ],
-        unique=True,
-        name="unique_user_month_category",
-    )
+    # The unique index is managed by setup_indexes.py.
+    # Each user has one budget per category/month.
 
     filter_query = {
         "user_id": user_id,
@@ -152,11 +154,19 @@ def save_budget(
         upsert=True,
     )
 
-    saved = budgets_collection.find_one(filter_query)
+    saved = budgets_collection.find_one(
+        filter_query
+    )
 
-    spending = calculate_spending(month, user_id)
+    spending = calculate_spending(
+        month,
+        user_id,
+    )
 
-    return serialize_budget(saved, spending)
+    return serialize_budget(
+        saved,
+        spending,
+    )
 
 
 # --------------------------------------------------

@@ -18,7 +18,9 @@ CLERK_SECRET_KEY = os.environ["CLERK_SECRET_KEY"]
 
 AUTHORIZED_PARTIES = [
     origin.strip()
-    for origin in os.environ["CLERK_AUTHORIZED_PARTIES"].split(",")
+    for origin in os.environ[
+        "CLERK_AUTHORIZED_PARTIES"
+    ].split(",")
     if origin.strip()
 ]
 
@@ -40,7 +42,15 @@ def get_current_user(
         raise HTTPException(
             status_code=401,
             detail="Authentication required",
-            headers={"WWW-Authenticate": "Bearer"},
+            headers={
+                "WWW-Authenticate": "Bearer",
+            },
         )
 
-    return state.payload["sub"]
+    user_id = state.payload["sub"]
+
+    # Only store identity after Clerk verification.
+    # SlowAPI uses this to apply per-user limits.
+    request.state.user_id = user_id
+
+    return user_id

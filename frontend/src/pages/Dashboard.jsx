@@ -1,5 +1,5 @@
 import MonthYearSelector from "../components/MonthYearSelector";
-import { formatMonthYear } from "../utils/MonthYear";
+import { formatMonthYear } from "../utils/monthYear";
 import { formatTransactionDate } from "../utils/date";
 import { useTheme } from "@mui/material/styles";
 import { useEffect, useState } from "react";

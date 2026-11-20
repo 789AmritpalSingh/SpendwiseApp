@@ -1,5 +1,5 @@
 import MonthYearSelector from "../components/MonthYearSelector";
-import { formatMonthYear } from "../utils/MonthYear";
+import { formatMonthYear } from "../utils/monthYear";
 import { useEffect, useState } from "react";
 import { useToast } from "../hooks/useToast";
 import { useApi } from "../hooks/useApi";

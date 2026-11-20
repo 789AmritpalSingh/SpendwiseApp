@@ -144,7 +144,9 @@ export default function TransactionForm({
               onChange={(e) => handleDescription(e.target.value)}
               required
               fullWidth
-              inputProps={{ maxLength: 200 }}
+              slotProps={{
+                htmlInput: { maxLength: 200 },
+              }}
             />
 
             <TextField
@@ -152,7 +154,12 @@ export default function TransactionForm({
               type="number"
               value={form.amount}
               onChange={(e) => updateField("amount", e.target.value)}
-              inputProps={{ min: "0.01", step: "0.01" }}
+              slotProps={{
+                htmlInput: {
+                  min: "0.01",
+                  step: "0.01",
+                },
+              }}
               required
               fullWidth
             />
@@ -162,7 +169,9 @@ export default function TransactionForm({
               type="date"
               value={form.date}
               onChange={(e) => updateField("date", e.target.value)}
-              InputLabelProps={{ shrink: true }}
+              slotProps={{
+                inputLabel: { shrink: true },
+              }}
               required
               fullWidth
             />

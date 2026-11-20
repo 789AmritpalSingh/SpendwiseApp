@@ -156,10 +156,15 @@ export default function Transactions() {
     <Box>
       <Stack
         direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "stretch", sm: "center" }}
         spacing={2}
-        sx={{ mb: 3 }}
+        sx={{
+          mb: 3,
+          justifyContent: "space-between",
+          alignItems: {
+            xs: "stretch",
+            sm: "center",
+          },
+        }}
       >
         <Box>
           <Typography variant="h4" fontWeight={700}>
